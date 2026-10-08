@@ -34,6 +34,23 @@ class EnergyOrb:
     def draw(self, screen):
         pulse = 2 + int((math.sin(self.phase) + 1) * 2)
         center = (int(self.x), int(self.y))
-        pygame.draw.circle(screen, (80, 220, 255), center, self.radius + pulse, 2)
-        pygame.draw.circle(screen, (120, 240, 255), center, self.radius)
-        pygame.draw.circle(screen, (235, 255, 255), center, self.radius // 2)
+
+        pygame.draw.circle(
+            screen,
+            (80, 220, 255),
+            center,
+            self.radius + pulse,
+            2,
+        )
+        pygame.draw.circle(
+            screen,
+            (120, 240, 255),
+            center,
+            self.radius,
+        )
+        pygame.draw.circle(
+            screen,
+            (235, 255, 255),
+            center,
+            self.radius // 2,
+        )
