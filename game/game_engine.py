@@ -13,6 +13,7 @@ BG = (8, 5, 20)
 SHIELD_DURATION = FPS * 10
 MULTIPLIER_INTERVAL = FPS * 10
 MAX_MULTIPLIER = 5
+LASER_COOLDOWN = 8
 
 
 class GameEngine:
@@ -46,6 +47,7 @@ class GameEngine:
         self.survival_frames = 0
         self.multiplier_timer = 0
         self.multiplier = 1
+        self.laser_cooldown = 0
         self.spawn_interval = 60
         self.score = 0
         self.game_over = False
@@ -62,8 +64,9 @@ class GameEngine:
                         self.reset()
                     elif not self.started:
                         self.started = True
-                    else:
+                    elif self.laser_cooldown == 0:
                         self.lasers.append(Laser(*self.ship.rect.midtop))
+                        self.laser_cooldown = LASER_COOLDOWN
 
         return True
 
@@ -106,9 +109,6 @@ class GameEngine:
             elif self.energy_orb.off_screen(HEIGHT):
                 self.energy_orb = None
 
-        if self.shield_timer > 0:
-            self.shield_timer -= 1
-
         for laser in self.lasers:
             laser.update()
 
@@ -131,25 +131,33 @@ class GameEngine:
         self.meteors = safe_meteors
 
         remaining_meteors = []
+        used_lasers = set()
 
         for meteor in self.meteors:
-            hit = any(
-                laser.rect.collidepoint(
-                    int(meteor.x),
-                    int(meteor.y),
-                )
-                for laser in self.lasers
+            hit_laser = next(
+                (
+                    index
+                    for index, laser in enumerate(self.lasers)
+                    if index not in used_lasers
+                    and laser.rect.collidepoint(
+                        int(meteor.x),
+                        int(meteor.y),
+                    )
+                ),
+                None,
             )
 
-            if not hit:
+            if hit_laser is None:
                 remaining_meteors.append(meteor)
             else:
+                used_lasers.add(hit_laser)
                 remaining_meteors.extend(meteor.split())
 
         self.meteors = remaining_meteors
         self.lasers = [
-            laser for laser in self.lasers
-            if not laser.off_screen()
+            laser
+            for index, laser in enumerate(self.lasers)
+            if index not in used_lasers and not laser.off_screen()
         ]
         self.meteors = [
             meteor for meteor in self.meteors
@@ -157,6 +165,12 @@ class GameEngine:
         ]
 
         self.score += self.multiplier
+
+        if self.laser_cooldown > 0:
+            self.laser_cooldown -= 1
+
+        if self.shield_timer > 0:
+            self.shield_timer -= 1
 
     def draw(self):
         self.screen.fill(BG)
