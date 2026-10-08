@@ -1,5 +1,6 @@
 import pygame
 import random
+
 from game.ship import Ship
 from game.meteor import Meteor
 from game.laser import Laser
@@ -10,6 +11,8 @@ WIDTH, HEIGHT = 700, 520
 FPS = 60
 BG = (8, 5, 20)
 SHIELD_DURATION = FPS * 10
+MULTIPLIER_INTERVAL = FPS * 10
+MAX_MULTIPLIER = 5
 
 
 class GameEngine:
@@ -20,6 +23,7 @@ class GameEngine:
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("monospace", 26, bold=True)
         self.big_font = pygame.font.SysFont("monospace", 46, bold=True)
+
         self.stars = [
             (
                 random.randint(0, WIDTH),
@@ -28,6 +32,7 @@ class GameEngine:
             )
             for _ in range(80)
         ]
+
         self.reset()
 
     def reset(self):
@@ -38,6 +43,9 @@ class GameEngine:
         self.powerup_timer = random.randint(300, 600)
         self.shield_timer = 0
         self.timer = 0
+        self.survival_frames = 0
+        self.multiplier_timer = 0
+        self.multiplier = 1
         self.spawn_interval = 60
         self.score = 0
         self.game_over = False
@@ -63,6 +71,16 @@ class GameEngine:
         if self.game_over or not self.started:
             return
 
+        self.survival_frames += 1
+        self.multiplier_timer += 1
+
+        if (
+            self.multiplier_timer >= MULTIPLIER_INTERVAL
+            and self.multiplier < MAX_MULTIPLIER
+        ):
+            self.multiplier += 1
+            self.multiplier_timer = 0
+
         keys = pygame.key.get_pressed()
         self.ship.move(keys, WIDTH, HEIGHT)
 
@@ -75,11 +93,13 @@ class GameEngine:
 
         if self.energy_orb is None:
             self.powerup_timer -= 1
+
             if self.powerup_timer <= 0:
                 self.energy_orb = EnergyOrb(WIDTH)
                 self.powerup_timer = random.randint(600, 900)
         else:
             self.energy_orb.update(WIDTH)
+
             if self.energy_orb.collides(self.ship.rect):
                 self.shield_timer = SHIELD_DURATION
                 self.energy_orb = None
@@ -93,6 +113,7 @@ class GameEngine:
             laser.update()
 
         safe_meteors = []
+
         for meteor in self.meteors:
             meteor.update()
 
@@ -100,7 +121,10 @@ class GameEngine:
                 if self.shield_timer > 0:
                     self.shield_timer = 0
                     continue
+
                 self.game_over = True
+                self.multiplier = 1
+                self.multiplier_timer = 0
 
             safe_meteors.append(meteor)
 
@@ -110,7 +134,10 @@ class GameEngine:
 
         for meteor in self.meteors:
             hit = any(
-                laser.rect.collidepoint(int(meteor.x), int(meteor.y))
+                laser.rect.collidepoint(
+                    int(meteor.x),
+                    int(meteor.y),
+                )
                 for laser in self.lasers
             )
 
@@ -121,14 +148,15 @@ class GameEngine:
 
         self.meteors = remaining_meteors
         self.lasers = [
-            laser for laser in self.lasers if not laser.off_screen()
+            laser for laser in self.lasers
+            if not laser.off_screen()
         ]
         self.meteors = [
             meteor for meteor in self.meteors
             if not meteor.off_screen(HEIGHT)
         ]
 
-        self.score += 1
+        self.score += self.multiplier
 
     def draw(self):
         self.screen.fill(BG)
@@ -162,11 +190,21 @@ class GameEngine:
             )
 
         score_text = self.font.render(
-            f"Time: {self.score // 60}s",
+            f"Time: {self.survival_frames // 60}s",
             True,
             (200, 200, 240),
         )
         self.screen.blit(score_text, (10, 10))
+
+        multiplier_text = self.font.render(
+            f"x{self.multiplier}",
+            True,
+            (255, 220, 100),
+        )
+        self.screen.blit(
+            multiplier_text,
+            (WIDTH - multiplier_text.get_width() - 10, 10),
+        )
 
         if not self.started:
             message = self.font.render(
@@ -193,7 +231,7 @@ class GameEngine:
                 (220, 80, 60),
             )
             submessage = self.font.render(
-                f"Survived {self.score // 60}s | SPACE to Restart",
+                f"Survived {self.survival_frames // 60}s | SPACE to Restart",
                 True,
                 (200, 200, 200),
             )
